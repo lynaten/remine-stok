@@ -14,24 +14,17 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
-
-    @@index([name])
-}
-
 model Log {
     id          Int     @id @default(autoincrement())
     description String
     recipient   String?
 
     orderDate DateTime
+
+    stockChange Int
+
+    product   Product @relation(fields: [productId], references: [id])
+    productId Int
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -42,8 +35,43 @@ model Log {
     @@index([orderDate, description, recipient])
 }
 
+enum ModificationType {
+    ADD
+    EDIT
+    DELETE
+}
+
 model Notification {
-    id Int @id @default(autoincrement())
+    id               Int              @id @default(autoincrement())
+    modificationType ModificationType
+    modifiedLogDesc  String?
+    modifiedLogRec   String?
+    modifiedLogDate  DateTime?
+
+    User     User?   @relation(fields: [userName], references: [name])
+    userName String?
+}
+
+model Product {
+    id    Int    @id @default(autoincrement())
+    name  String
+    stock Int
+    price Int
+
+    category   Category @relation(fields: [categoryId], references: [id])
+    categoryId Int
+    Log        Log[]
+
+    @@index([name])
+}
+
+model Category {
+    id          Int       @id @default(autoincrement())
+    name        String
+    description String
+    Product     Product[]
+
+    @@index([name])
 }
 
 // Necessary for Next auth
@@ -75,15 +103,16 @@ model Session {
 }
 
 model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    posts         Post[]
-    Log           Log[]
+    id             String         @id @default(cuid())
+    name           String         @unique
+    email          String?        @unique
+    hashedPassword String?
+    isVerified     Boolean        @default(false)
+    image          String?
+    accounts       Account[]
+    sessions       Session[]
+    Log            Log[]
+    Notification   Notification[]
 }
 
 model VerificationToken {

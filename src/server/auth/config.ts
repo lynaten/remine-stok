@@ -1,7 +1,6 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
-import DiscordProvider from "next-auth/providers/discord";
-
+import GoogleProvider from "next-auth/providers/google";
 import { db } from "@/server/db";
 
 /**
@@ -14,8 +13,7 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      // ...other properties
-      // role: UserRole;
+      isVerified: boolean;
     } & DefaultSession["user"];
   }
 
@@ -32,25 +30,44 @@ declare module "next-auth" {
  */
 export const authConfig = {
   providers: [
-    DiscordProvider,
-    /**
-     * ...add more providers here.
-     *
-     * Most other providers require a bit more work than the Discord provider. For example, the
-     * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
-     * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
-     *
-     * @see https://next-auth.js.org/providers/github
-     */
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
   ],
   adapter: PrismaAdapter(db),
   callbacks: {
-    session: ({ session, user }) => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: user.id,
-      },
-    }),
+    async session({ session, user }) {
+      // Fetch the latest user data from the database
+      const dbUser = await db.user.findUnique({
+        where: { id: user.id },
+      });
+
+      // Ensure the user exists in the database
+      if (dbUser) {
+        // Include the isVerified status in the session
+        session.user = {
+          ...session.user,
+          id: user.id,
+          isVerified: dbUser.isVerified,
+        };
+      }
+
+      return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Redirect to the landing page after sign in or sign out
+      if (url === "/api/auth/signin" || url === "/api/auth/signout") {
+        return baseUrl; // Redirect to the base URL (landing page)
+      }
+      return url; // Allow other redirects to proceed
+    },
+  },
+
+  theme: {
+    colorScheme: "auto", // Can be "auto", "dark", or "light"
+    logo: "/remine.png", // Custom logo (optional)
+    brandColor: "#ee4492",
+    buttonText: "#e8e620",
   },
 } satisfies NextAuthConfig;
