@@ -6,6 +6,8 @@ import { api } from "@/trpc/react";
 import { useState } from "react";
 import AlertMessage from "./AlertMessage";
 
+import { AlertDialogCancel } from "@/components/ui/alert-dialog";
+
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -85,6 +87,8 @@ export function AddCatForm() {
             </FormItem>
           )}
         />
+        <AlertDialogCancel className="mr-3">Cancel</AlertDialogCancel>
+
         <Button type="submit" disabled={createCategory.isPending}>
           {createCategory.isPending ? "Submitting..." : "Submit"}
         </Button>

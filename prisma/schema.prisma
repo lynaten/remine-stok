@@ -14,44 +14,6 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-model Log {
-    id          Int     @id @default(autoincrement())
-    description String
-    recipient   String?
-
-    orderDate DateTime
-
-    stockChange Int
-
-    product   Product @relation(fields: [productId], references: [id])
-    productId Int
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
-
-    @@index([orderDate, description, recipient])
-}
-
-enum ModificationType {
-    ADD
-    EDIT
-    DELETE
-}
-
-model Notification {
-    id               Int              @id @default(autoincrement())
-    modificationType ModificationType
-    modifiedLogDesc  String?
-    modifiedLogRec   String?
-    modifiedLogDate  DateTime?
-
-    User     User?   @relation(fields: [userName], references: [name])
-    userName String?
-}
-
 model Product {
     id    Int    @id @default(autoincrement())
     name  String
@@ -60,7 +22,6 @@ model Product {
 
     category   Category @relation(fields: [categoryId], references: [id])
     categoryId Int
-    Log        Log[]
 
     @@index([name])
 }
@@ -94,31 +55,15 @@ model Account {
     @@unique([provider, providerAccountId])
 }
 
-model Session {
-    id           String   @id @default(cuid())
-    sessionToken String   @unique
-    userId       String
-    expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
 model User {
     id             String         @id @default(cuid())
     name           String         @unique
     email          String?        @unique
     hashedPassword String?
+    emailVerified  Boolean?
     isVerified     Boolean        @default(false)
     image          String?
     accounts       Account[]
-    sessions       Session[]
     Log            Log[]
     Notification   Notification[]
-}
-
-model VerificationToken {
-    identifier String
-    token      String   @unique
-    expires    DateTime
-
-    @@unique([identifier, token])
 }

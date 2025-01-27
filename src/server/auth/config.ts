@@ -2,32 +2,8 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { db } from "@/server/db";
+import { getUserById, createUser } from "../helper";
 
-/**
- * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
- * object and keep type safety.
- *
- * @see https://next-auth.js.org/getting-started/typescript#module-augmentation
- */
-declare module "next-auth" {
-  interface Session extends DefaultSession {
-    user: {
-      id: string;
-      isVerified: boolean;
-    } & DefaultSession["user"];
-  }
-
-  // interface User {
-  //   // ...other properties
-  //   // role: UserRole;
-  // }
-}
-
-/**
- * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
- *
- * @see https://next-auth.js.org/configuration/options
- */
 export const authConfig = {
   providers: [
     GoogleProvider({
@@ -35,34 +11,73 @@ export const authConfig = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-  adapter: PrismaAdapter(db),
+  session: {
+    strategy: "jwt",
+  },
   callbacks: {
-    async session({ session, user }) {
-      // Fetch the latest user data from the database
-      const dbUser = await db.user.findUnique({
-        where: { id: user.id },
-      });
+    async signIn({ user, account, profile, email, credentials }) {
+      // Attempt to retrieve the existing user from the database
+      const existingUser = await getUserById(user.id);
 
-      // Ensure the user exists in the database
-      if (dbUser) {
-        // Include the isVerified status in the session
-        session.user = {
-          ...session.user,
+      if (!existingUser && user.id && user.name) {
+        const randomUUID = () => crypto.randomUUID();
+
+        await createUser({
           id: user.id,
-          isVerified: dbUser.isVerified,
-        };
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          hashedPassword: null,
+          isVerified: false,
+          emailVerified: null,
+          accountId: randomUUID(),
+          type: account?.type,
+          provider: account?.provider,
+          providerAccountId: account?.providerAccountId,
+          refresh_token: account?.refresh_token,
+          access_token: account?.access_token,
+          expires_at: account?.expires_at,
+          token_type: account?.token_type,
+          scope: account?.scope,
+          id_token: account?.id_token,
+          session_state: null,
+          refresh_token_expires_in: null,
+        });
+        return false;
       }
 
+      if (!user.id || !user.name) {
+        return false;
+      }
+
+      // User exists, check if they are verified
+      if (existingUser && !existingUser.isVerified) {
+        // User is not verified, prevent sign-in
+        return false;
+      }
+
+      // User exists and is verified, allow sign-in
+      return true;
+    },
+
+    async session({ session, token }) {
+      if (token.sub && session.user) {
+        session.user.id = token.sub;
+      }
+      if (token.isVerified && session.user) {
+        session.user.isVerified = token.isVerified;
+      }
       return session;
     },
-    async redirect({ url, baseUrl }) {
-      // Redirect to the landing page after sign in or sign out
-      if (url === "/api/auth/signin" || url === "/api/auth/signout") {
-        return baseUrl; // Redirect to the base URL (landing page)
-      }
-      return url; // Allow other redirects to proceed
+    async jwt({ token }) {
+      if (!token.sub && token.email != null) return token;
+      const user = await getUserById(token.sub);
+      if (!user) return token;
+      token.isVerified = user?.isVerified;
+      return token;
     },
   },
+  adapter: PrismaAdapter(db),
 
   theme: {
     colorScheme: "auto", // Can be "auto", "dark", or "light"
