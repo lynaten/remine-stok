@@ -74,6 +74,10 @@ export function Navbar() {
             <Link href={"/repack-order"}>
               <MenubarItem>Repack Order</MenubarItem>
             </Link>
+            <MenubarSeparator />
+            <Link href={"/adjustment-order"}>
+              <MenubarItem>Adjustment Order</MenubarItem>
+            </Link>
           </MenubarContent>
         </MenubarMenu>
         <MenubarMenu>
